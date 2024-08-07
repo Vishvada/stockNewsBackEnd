@@ -28,7 +28,9 @@ app.use(passport.session());
 const createResponse = (status, error, message) => ({ status, error, message });
 
 
-
+app.get('/',(req,res)=>{
+  res.send("HELLO")
+})
 app.get('/all-stocks', async (req, res) => {
   if (req.isAuthenticated()) {
     try {
