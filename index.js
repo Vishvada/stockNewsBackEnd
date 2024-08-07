@@ -9,23 +9,34 @@ import { addUser, checkPassword, getUser, getUserStocks, getAllStocks, addUserSt
 import news from "./utils/scraper.js";
 
 const app = express();
-const port = 3000;
+
+const port=3000
+
+const isProduction = process.env.NODE_ENV === 'production';
+
 app.use(cors({
-  origin: ["http://localhost:5173", "https://your-frontend-domain.com"], // Add your frontend domain
+  origin: isProduction ? "https://your-frontend-domain.com" : "http://localhost:5173",
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
+
 app.use(session({
-  secret: "stockNews",
+  secret: process.env.SESSION_SECRET || "stockNews",
   resave: false,
   saveUninitialized: false,
-  cookie: { secure: false}
+  cookie: { 
+    secure: isProduction,
+    httpOnly: true,
+    sameSite: 'lax',
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+  }
 }));
+
+
 app.use(passport.initialize());
 app.use(passport.session());
 
@@ -91,23 +102,6 @@ app.get('/stocks', async (req, res) => {
   }
 });
 
-app.post('/login', (req, res, next) => {
-  passport.authenticate('local', (err, user, info) => {
-    if (err) {
-      return res.status(500).json(createResponse(url.FORBIDDEN, true, err.message));
-    }
-    if (!user) {
-      return res.status(200).json(createResponse(url.UNAUTHORISED, true, 'Username or password incorrect!' || info.message ));
-    }
-    req.logIn(user, (err) => {
-      if (err) {
-        return res.status(500).json(createResponse(url.FORBIDDEN, true, err.message));
-      }
-      return res.status(200).json(createResponse(url.OK, false, 'Logged in successfully'));
-    });
-  })(req, res, next);
-});
-
 app.post('/signup', async (req, res) => {
   const { name, email, password } = req.body;
   
@@ -158,6 +152,23 @@ passport.deserializeUser(async (email, cb) => {
   } catch (err) {
     cb(err);
   }
+});
+
+app.post('/login', (req, res, next) => {
+  passport.authenticate('local', (err, user, info) => {
+    if (err) {
+      return res.status(500).json(createResponse(url.FORBIDDEN, true, err.message));
+    }
+    if (!user) {
+      return res.status(200).json(createResponse(url.UNAUTHORISED, true, 'Username or password incorrect!' || info.message ));
+    }
+    req.logIn(user, (err) => {
+      if (err) {
+        return res.status(500).json(createResponse(url.FORBIDDEN, true, err.message));
+      }
+      return res.status(200).json(createResponse(url.OK, false, 'Logged in successfully'));
+    });
+  })(req, res, next);
 });
 
 app.listen(port, () => {
